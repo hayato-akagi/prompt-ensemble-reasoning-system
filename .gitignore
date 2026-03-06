@@ -1,0 +1,55 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+.venv/
+venv/
+env/
+
+# pytest / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+
+# Models (large binary files)
+data/models/*.gguf
+data/models/*.bin
+data/models/*.safetensors
+data/models/.cache/
+
+# Experiments & eval results (generated data)
+data/experiments/
+data/eval_results/
+
+# Knowledge (user data — keep sample files via exceptions below)
+data/knowledge/*.json
+!data/knowledge/sample_dataset.json
+
+# Streamlit
+.streamlit/secrets.toml
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Docker
+*.env
+.env.local
+.env.production
+
+# Claude Code
+.claude/settings.local.json

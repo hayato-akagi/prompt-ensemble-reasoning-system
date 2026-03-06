@@ -1,0 +1,17 @@
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/.pytest_cache
+
+# GGUF モデルはボリュームマウントで提供するためイメージに含めない
+data/models/
+
+# ログはボリュームマウント
+data/logs/
+
+# README・ドキュメント
+*.md
+
+# Git
+.git
+.gitignore

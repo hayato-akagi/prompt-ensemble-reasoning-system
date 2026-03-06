@@ -1,0 +1,95 @@
+services:
+
+  # ---------------------------------------------------------------
+  # モデルダウンローダー
+  #
+  # モデル一覧:    docker compose run --rm downloader --list
+  # ダウンロード:  docker compose run --rm downloader --model-id qwen2.5-7b-instruct-q4_k_m --set-active
+  # 直接指定:     docker compose run --rm downloader --repo-id <repo> --filename <file>
+  # ---------------------------------------------------------------
+  downloader:
+    build:
+      context: .
+      dockerfile: scripts/Dockerfile
+    volumes:
+      - ./data/models:/app/data/models   # ダウンロード先（ホストと共有）
+      - ./config:/app/config             # models.json 参照 + inference.json 書き換え
+
+  # ---------------------------------------------------------------
+  # ingestion ユニットテスト（LLM 不要・すぐ完了）
+  #
+  # 実行: docker compose run --rm ingestion
+  # ---------------------------------------------------------------
+  ingestion:
+    build:
+      context: .
+      dockerfile: services/ingestion/Dockerfile
+    volumes:
+      - ./data/knowledge:/app/data/knowledge
+
+  # ---------------------------------------------------------------
+  # experiment ユニットテスト（LLM 不要・すぐ完了）
+  #
+  # 実行: docker compose run --rm experiment
+  # ---------------------------------------------------------------
+  experiment:
+    build:
+      context: .
+      dockerfile: services/experiment/Dockerfile
+    volumes:
+      - ./data/experiments:/app/data/experiments
+
+  # ---------------------------------------------------------------
+  # knowledge ユニットテスト（LLM 不要・すぐ完了）
+  #
+  # 実行: docker compose run --rm knowledge
+  # ---------------------------------------------------------------
+  knowledge:
+    build:
+      context: .
+      dockerfile: services/knowledge/Dockerfile
+    volumes:
+      - ./data/knowledge:/app/data/knowledge
+
+  # ---------------------------------------------------------------
+  # inference ユニットテスト（LLM 不要・モックで動作）
+  #   デフォルト: pytest tests/inference/ -v
+  #
+  # ユニットテスト: docker compose run --rm inference
+  # 統合テスト:    docker compose run --rm inference pytest -m integration -v
+  #   ※ 統合テストは GGUF モデルが必要。事前に downloader を実行すること。
+  # ---------------------------------------------------------------
+  inference:
+    build:
+      context: .
+      dockerfile: services/inference/Dockerfile
+    volumes:
+      - ./data/knowledge:/app/data/knowledge
+      - ./data/models:/app/data/models   # ダウンローダーと共有
+      - ./data/logs:/app/data/logs
+      - ./data/prompts:/app/data/prompts # プロンプトテンプレート（UI から編集可能）
+      - ./data/eval_results:/app/data/eval_results  # 評価結果の出力先
+      - ./config:/app/config             # active_model / active_template の参照
+    depends_on:
+      knowledge:
+        condition: service_completed_successfully
+
+  # ---------------------------------------------------------------
+  # Streamlit UI
+  #
+  # 起動: docker compose up ui
+  # アクセス: http://localhost:8501
+  # ---------------------------------------------------------------
+  ui:
+    build:
+      context: .
+      dockerfile: services/ui/Dockerfile
+    ports:
+      - "8501:8501"
+    volumes:
+      - ./data/knowledge:/app/data/knowledge
+      - ./data/models:/app/data/models
+      - ./data/prompts:/app/data/prompts
+      - ./data/experiments:/app/data/experiments
+      - ./data/eval_results:/app/data/eval_results  # 評価結果の読み込み
+      - ./config:/app/config

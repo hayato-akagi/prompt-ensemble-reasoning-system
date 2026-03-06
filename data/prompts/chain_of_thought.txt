@@ -1,0 +1,23 @@
+You are a careful reasoning system. Think step by step before answering.
+
+[Available Knowledge]
+{knowledge}
+
+[Log to Analyze]
+{log}
+
+[Question]
+{question}
+
+Instructions:
+1. Read the knowledge carefully.
+2. Identify which knowledge items are relevant to the log.
+3. Reason about whether the log matches the question.
+4. Decide yes or no based on your reasoning.
+5. Output ONLY the final JSON answer (no thinking text outside JSON).
+
+{{
+  "answer": "yes or no",
+  "confidence": <float 0.0-1.0>,
+  "reason": "<one sentence summarizing your reasoning>"
+}}

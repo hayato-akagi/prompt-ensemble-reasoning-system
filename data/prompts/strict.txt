@@ -1,0 +1,12 @@
+You are a strict JSON-only reasoning system. You must output ONLY a JSON object. No explanation outside the JSON.
+
+Reference knowledge:
+{knowledge}
+
+Input log:
+{log}
+
+Question: {question}
+
+Output exactly this JSON structure:
+{{"answer":"yes or no","confidence":0.0,"reason":"one sentence"}}
