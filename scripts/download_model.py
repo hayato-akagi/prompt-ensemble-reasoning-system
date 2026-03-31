@@ -46,6 +46,13 @@ def find_by_id(model_id: str) -> dict | None:
     return next((m for m in load_registry() if m["id"] == model_id), None)
 
 
+def _filenames_for_model(meta: dict) -> list[str]:
+    filenames = meta.get("filenames")
+    if isinstance(filenames, list) and filenames:
+        return [str(name) for name in filenames]
+    return [str(meta["filename"])]
+
+
 def list_models() -> None:
     registry = load_registry()
     if not registry:
@@ -57,7 +64,9 @@ def list_models() -> None:
     print(f"\n{'ID':<40} {'STATUS':<12} DESCRIPTION")
     print("-" * 80)
     for m in registry:
-        status = "[downloaded]" if m["filename"] in downloaded else "[not yet]  "
+        required_files = _filenames_for_model(m)
+        is_downloaded = all(name in downloaded for name in required_files)
+        status = "[downloaded]" if is_downloaded else "[not yet]  "
         print(f"{m['id']:<40} {status} {m['description']}")
     print()
 
@@ -68,7 +77,14 @@ def download_by_id(model_id: str) -> Path:
         print(f"Error: model '{model_id}' not found in config/models.json", file=sys.stderr)
         print("Use --list to show available models.", file=sys.stderr)
         sys.exit(1)
-    return download(meta["repo_id"], meta["filename"])
+    return download_many(meta["repo_id"], _filenames_for_model(meta))
+
+
+def download_many(repo_id: str, filenames: list[str]) -> Path:
+    downloaded_paths: list[Path] = []
+    for filename in filenames:
+        downloaded_paths.append(download(repo_id, filename))
+    return downloaded_paths[0]
 
 
 def download(repo_id: str, filename: str) -> Path:

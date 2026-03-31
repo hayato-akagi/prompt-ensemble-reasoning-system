@@ -3,7 +3,11 @@
     {
       "id": "qwen2.5-7b-instruct-q4_k_m",
       "repo_id": "Qwen/Qwen2.5-7B-Instruct-GGUF",
-      "filename": "qwen2.5-7b-instruct-q4_k_m.gguf",
+      "filename": "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf",
+      "filenames": [
+        "qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf",
+        "qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf"
+      ],
       "description": "Qwen 2.5 7B Instruct (Q4_K_M, ~4.4GB)",
       "context_length": 4096
     },
@@ -17,7 +21,12 @@
     {
       "id": "qwen2.5-14b-instruct-q4_k_m",
       "repo_id": "Qwen/Qwen2.5-14B-Instruct-GGUF",
-      "filename": "qwen2.5-14b-instruct-q4_k_m.gguf",
+      "filename": "qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf",
+      "filenames": [
+        "qwen2.5-14b-instruct-q4_k_m-00001-of-00003.gguf",
+        "qwen2.5-14b-instruct-q4_k_m-00002-of-00003.gguf",
+        "qwen2.5-14b-instruct-q4_k_m-00003-of-00003.gguf"
+      ],
       "description": "Qwen 2.5 14B Instruct (Q4_K_M, ~8.4GB) — 高精度",
       "context_length": 4096
     }

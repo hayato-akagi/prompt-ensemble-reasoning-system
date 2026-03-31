@@ -27,7 +27,7 @@ docker compose run --rm downloader --model-id qwen2.5-3b-instruct-q4_k_m --set-a
 ```bash
 docker compose run --rm downloader \
   --repo-id Qwen/Qwen2.5-7B-Instruct-GGUF \
-  --filename qwen2.5-7b-instruct-q4_k_m.gguf
+  --filename qwen2.5-7b-instruct-q4_k_m-00001-of-00002.gguf
 ```
 
 ## ダウンロード先
