@@ -9,14 +9,14 @@
         "qwen2.5-7b-instruct-q4_k_m-00002-of-00002.gguf"
       ],
       "description": "Qwen 2.5 7B Instruct (Q4_K_M, ~4.4GB)",
-      "context_length": 4096
+      "context_length": 32768
     },
     {
       "id": "qwen2.5-3b-instruct-q4_k_m",
       "repo_id": "Qwen/Qwen2.5-3B-Instruct-GGUF",
       "filename": "qwen2.5-3b-instruct-q4_k_m.gguf",
       "description": "Qwen 2.5 3B Instruct (Q4_K_M, ~2.0GB) — 軽量・高速",
-      "context_length": 4096
+      "context_length": 32768
     },
     {
       "id": "qwen2.5-14b-instruct-q4_k_m",
@@ -28,7 +28,7 @@
         "qwen2.5-14b-instruct-q4_k_m-00003-of-00003.gguf"
       ],
       "description": "Qwen 2.5 14B Instruct (Q4_K_M, ~8.4GB) — 高精度",
-      "context_length": 4096
+      "context_length": 32768
     }
   ]
 }

@@ -92,6 +92,7 @@ class ClassRunResult:
     ground_truth: list[str]           # 正解ラベル（複数可）
     exact_match: bool                 # predicted_labels set == ground_truth set
     jaccard: float                    # |intersection| / |union|
+    log_id: str = ""                  # 入力データの log_id
     label_predictions: list[LabelPrediction] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:

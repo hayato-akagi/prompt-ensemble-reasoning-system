@@ -1,0 +1,27 @@
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-dev python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 \
+ && ln -sf /usr/bin/python3 /usr/bin/python \
+ && ln -sf /usr/bin/pip3 /usr/bin/pip
+
+COPY services/ui/requirements.txt services/ui/requirements.txt
+# CPU版をインストールしてからCUDA対応版で上書き
+RUN pip install --no-cache-dir -r services/ui/requirements.txt \
+ && CMAKE_ARGS="-DGGML_CUDA=ON" pip install --no-cache-dir --force-reinstall llama-cpp-python
+
+COPY services/ services/
+
+ENV PYTHONPATH=/app
+
+EXPOSE 8501
+
+CMD ["streamlit", "run", "services/ui/app.py", \
+     "--server.address=0.0.0.0", \
+     "--server.port=8501", \
+     "--server.headless=true"]

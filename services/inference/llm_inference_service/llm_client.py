@@ -67,6 +67,17 @@ def _resolve_model_path(active_model: str) -> Path:
     return local_path
 
 
+def _resolve_n_ctx(active_model: str, n_ctx_cfg: int) -> int:
+    """
+    n_ctx を解決する。0 の場合は models.json の context_length を使用する。
+    """
+    if n_ctx_cfg:
+        return n_ctx_cfg
+    registry = _load_model_registry()
+    meta = next((m for m in registry if m["id"] == active_model), None)
+    return meta.get("context_length", 4096) if meta else 4096
+
+
 class LLMClient:
     """Thin wrapper around Llama for single-shot text generation."""
 
@@ -83,10 +94,11 @@ class LLMClient:
 
         active_model = model_id or cfg["active_model"]
         model_path = _resolve_model_path(active_model)
+        n_ctx = _resolve_n_ctx(active_model, model_cfg.get("n_ctx", 0))
 
         self._llm = Llama(
             model_path=str(model_path),
-            n_ctx=model_cfg.get("n_ctx", 2048),
+            n_ctx=n_ctx,
             n_gpu_layers=model_cfg.get("n_gpu_layers", 0),
             verbose=model_cfg.get("verbose", False),
         )
@@ -104,6 +116,15 @@ class LLMClient:
             top_p=self._top_p,
         )
         return result["choices"][0]["text"]
+
+    def token_count(self, text: str) -> int:
+        """モデルのトークナイザーでトークン数を返す。"""
+        tokens = self._llm.tokenize(text.encode("utf-8"), add_bos=False)
+        return len(tokens)
+
+    def context_size(self) -> int:
+        """ロード済みモデルの実際のコンテキスト長を返す。"""
+        return self._llm.n_ctx()
 
     def generate_json(self, prompt: str) -> dict[str, Any]:
         """

@@ -10,6 +10,7 @@ Users configure:
 The system runs one Yes/No ensemble inference per label and displays a classification result.
 """
 
+import json
 import pandas as pd
 import streamlit as st
 from pathlib import Path
@@ -20,6 +21,14 @@ st.set_page_config(page_title="Inference", layout="wide")
 st.title("Inference")
 st.caption("ログをラベルで多クラス分類（各ラベルに Yes/No アンサンブル推論）")
 
+_ROOT = Path(__file__).resolve().parents[3]
+
+
+def _load_inference_cfg() -> dict:
+    with open(_ROOT / "config" / "inference.json", encoding="utf-8") as f:
+        return json.load(f)
+
+
 # ---------------------------------------------------------------------------
 # Sidebar: knowledge status
 # ---------------------------------------------------------------------------
@@ -28,6 +37,9 @@ all_ids = km.list_ids()
 st.sidebar.metric("ナレッジ件数", len(all_ids))
 if not all_ids:
     st.sidebar.warning("ナレッジが登録されていません。Knowledge ページで登録してください。")
+
+cfg = _load_inference_cfg()
+knowledge_token_limit: int = cfg.get("knowledge_token_limit", 512)
 
 # ---------------------------------------------------------------------------
 # Section 1: Classification settings
@@ -119,14 +131,18 @@ if all_ids:
     )
     if selected_knowledge_ids:
         st.caption(f"{len(selected_knowledge_ids)} 件を選択中（全 {len(all_ids)} 件中）")
-        selected_units = [km.load(kid) for kid in selected_knowledge_ids]
-        active_texts = km.texts(selected_units)
+        active_units = [km.load(kid) for kid in selected_knowledge_ids]
     else:
         st.caption(f"全 {len(all_ids)} 件を使用")
-        active_texts = km.texts()
+        active_units = km.load_all()
 else:
     selected_knowledge_ids = []
-    active_texts = []
+    active_units = []
+
+if knowledge_token_limit > 0:
+    st.caption(f"ナレッジ自動要約: 有効（閾値 {knowledge_token_limit} トークン）")
+else:
+    st.caption("ナレッジ自動要約: 無効（Settings で設定可）")
 
 st.divider()
 
@@ -145,15 +161,56 @@ log_text = st.text_area(
     key="infer_log",
 )
 
+summarize_log_opt = st.checkbox(
+    f"ログが {knowledge_token_limit} トークンを超える場合は要約する",
+    key="infer_summarize_log",
+    help="エラーコード・異常値など重要情報を保持したまま要約します。",
+    disabled=(knowledge_token_limit == 0),
+)
+
 run_btn = st.button("推論実行", type="primary", disabled=not log_text.strip())
 
 # ---------------------------------------------------------------------------
-# Section 3: Result
+# Section 4: Result
 # ---------------------------------------------------------------------------
 if run_btn:
-    if not active_texts:
+    if not active_units:
         st.error("ナレッジが登録されていません。Knowledge ページで登録してください。")
         st.stop()
+
+    # --- ナレッジ自動要約 ---
+    active_texts = km.texts(active_units)
+    if knowledge_token_limit > 0:
+        needs_check = [u for u in active_units if len(u.effective_text) > knowledge_token_limit * 2]
+        if needs_check:
+            from services.inference.llm_inference_service.summarizer import SummarizationService
+            summarizer = SummarizationService()
+            updated = False
+            with st.spinner(f"ナレッジのトークン数を確認・要約中（対象 {len(needs_check)} 件）..."):
+                for unit in needs_check:
+                    effective = unit.effective_text
+                    if summarizer.needs_summarization(effective, knowledge_token_limit):
+                        summary = summarizer.summarize_knowledge(effective)
+                        km.save_summary(unit.knowledge_id, summary)
+                        updated = True
+            if updated:
+                active_units = [km.load(u.knowledge_id) for u in active_units]
+                active_texts = km.texts(active_units)
+                st.info("長いナレッジを要約しました。")
+            del summarizer
+
+    # --- ログ要約 ---
+    log_to_use = log_text.strip()
+    if summarize_log_opt and knowledge_token_limit > 0:
+        from services.inference.llm_inference_service.summarizer import SummarizationService
+        summarizer = SummarizationService()
+        with st.spinner("ログのトークン数を確認・要約中..."):
+            log_to_use, was_summarized = summarizer.maybe_summarize_log(log_text.strip(), knowledge_token_limit)
+        if was_summarized:
+            st.info("ログを要約しました。")
+            with st.expander("要約後のログ"):
+                st.text(log_to_use)
+        del summarizer
 
     with st.spinner(f"推論中（{len(labels)} ラベル × N={n_ensemble}）..."):
         from services.inference.llm_inference_service.classifier import ClassificationService
@@ -165,7 +222,7 @@ if run_btn:
             aggregation=aggregation,
         )
         try:
-            result = svc.classify(knowledge_texts=active_texts, log=log_text.strip())
+            result = svc.classify(knowledge_texts=active_texts, log=log_to_use)
         except RuntimeError as e:
             st.error(f"推論エラー: {e}")
             st.stop()
@@ -195,7 +252,7 @@ if "infer_result" in st.session_state:
             "Yes 比率": round(lr.yes_ratio, 3),
         })
     df = pd.DataFrame(rows)
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
 
     chart_df = pd.DataFrame({
         "Confidence": {lr.label: lr.confidence for lr in result.label_details},

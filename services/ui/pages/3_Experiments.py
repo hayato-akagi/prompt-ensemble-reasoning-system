@@ -11,6 +11,7 @@ Tabs:
 import json
 import pandas as pd
 import streamlit as st
+from pathlib import Path
 
 from services.experiment.experiment_manager.experiment_manager import ExperimentManager
 from services.knowledge.knowledge_manager.knowledge_manager import KnowledgeManager
@@ -19,8 +20,39 @@ st.set_page_config(page_title="Experiments", layout="wide")
 st.title("Experiments")
 st.caption("ラベルベース多クラス分類実験 — データセット一括評価")
 
+_ROOT = Path(__file__).resolve().parents[3]
+
 em = ExperimentManager()
 km = KnowledgeManager()
+
+
+def _load_knowledge_token_limit() -> int:
+    cfg_path = _ROOT / "config" / "inference.json"
+    cfg = json.loads(cfg_path.read_text(encoding="utf-8"))
+    return cfg.get("knowledge_token_limit", 512)
+
+
+def _auto_summarize_units(units, knowledge_token_limit: int):
+    """長いナレッジを LLM で要約してキャッシュし、更新後のテキストリストを返す。"""
+    from services.inference.llm_inference_service.summarizer import SummarizationService
+    needs_check = [u for u in units if len(u.effective_text) > knowledge_token_limit * 2]
+    if not needs_check:
+        return km.texts(units), False
+
+    summarizer = SummarizationService()
+    updated = False
+    for unit in needs_check:
+        effective = unit.effective_text
+        if summarizer.needs_summarization(effective, knowledge_token_limit):
+            summary = summarizer.summarize_knowledge(effective)
+            km.save_summary(unit.knowledge_id, summary)
+            updated = True
+    del summarizer
+
+    if updated:
+        units = [km.load(u.knowledge_id) for u in units]
+    return km.texts(units), updated
+
 
 tab_create, tab_run, tab_results, tab_compare = st.tabs(
     ["作成", "バッチ実行", "結果一覧", "比較"]
@@ -183,18 +215,27 @@ with tab_run:
         if not cfg.labels:
             st.warning("この実験にラベルが設定されていません。「作成」タブで再作成してください。")
         else:
-            # Resolve knowledge texts for this experiment
+            # ナレッジ解決
             if cfg.knowledge_ids:
                 try:
-                    _units = [km.load(kid) for kid in cfg.knowledge_ids]
-                    exp_texts = km.texts(_units)
-                    st.caption(f"ナレッジ: {len(exp_texts)} 件（実験設定で固定）")
+                    exp_units = [km.load(kid) for kid in cfg.knowledge_ids]
+                    st.caption(f"ナレッジ: {len(exp_units)} 件（実験設定で固定）")
                 except Exception as e:
                     st.warning(f"ナレッジの読み込みエラー: {e}。全件を使用します。")
-                    exp_texts = km.texts()
+                    exp_units = km.load_all()
             else:
-                exp_texts = km.texts()
-                st.caption(f"ナレッジ: 全 {len(exp_texts)} 件")
+                exp_units = km.load_all()
+                st.caption(f"ナレッジ: 全 {len(exp_units)} 件")
+
+            knowledge_token_limit = _load_knowledge_token_limit()
+
+            # ログ要約オプション
+            summarize_log_opt = st.checkbox(
+                f"ログが {knowledge_token_limit} トークンを超える場合は要約する",
+                key="run_summarize_log",
+                help="エラーコード・異常値など重要情報を保持したまま要約します。",
+                disabled=(knowledge_token_limit == 0),
+            )
 
             uploaded = st.file_uploader(
                 "データセット JSON をアップロード",
@@ -216,18 +257,26 @@ with tab_run:
                         }
                         for d in dataset[:5]
                     ])
-                    st.dataframe(preview_df, use_container_width=True, hide_index=True)
+                    st.dataframe(preview_df, width="stretch", hide_index=True)
                     if len(dataset) > 5:
                         st.caption(f"（先頭5件を表示。全{len(dataset)}件）")
                 except Exception as e:
                     st.error(f"JSON 解析エラー: {e}")
                     dataset = None
 
-            run_disabled = dataset is None or not exp_texts
-            if not exp_texts:
+            run_disabled = dataset is None or not exp_units
+            if not exp_units:
                 st.warning("ナレッジが登録されていません。")
 
             if st.button("バッチ実行", type="primary", disabled=run_disabled, key="btn_batch_run"):
+                # ナレッジ自動要約
+                exp_texts = km.texts(exp_units)
+                if knowledge_token_limit > 0:
+                    with st.spinner("ナレッジのトークン数を確認・要約中..."):
+                        exp_texts, updated = _auto_summarize_units(exp_units, knowledge_token_limit)
+                    if updated:
+                        st.info("長いナレッジを要約しました。")
+
                 from services.inference.llm_inference_service.classifier import ClassificationService
                 svc = ClassificationService(
                     labels=cfg.labels,
@@ -236,6 +285,12 @@ with tab_run:
                     knowledge_sampling="random",
                     aggregation="weighted",
                 )
+
+                # ログ要約用サービス（必要な場合のみ）
+                log_summarizer = None
+                if summarize_log_opt and knowledge_token_limit > 0:
+                    from services.inference.llm_inference_service.summarizer import SummarizationService
+                    log_summarizer = SummarizationService(client=svc._svc._client)
 
                 progress = st.progress(0)
                 status = st.empty()
@@ -248,26 +303,40 @@ with tab_run:
 
                     status.caption(f"[{i+1}/{len(dataset)}] {log_id} を推論中...")
 
+                    # ログ要約
+                    log_to_use = log_text
+                    if log_summarizer:
+                        log_to_use, _ = log_summarizer.maybe_summarize_log(log_text, knowledge_token_limit)
+
                     try:
-                        cls_result = svc.classify(knowledge_texts=exp_texts, log=log_text)
+                        cls_result = svc.classify(knowledge_texts=exp_texts, log=log_to_use)
                         run_result = em.save_class_result(
-                            selected_exp, log_text, cls_result, ground_truth
+                            selected_exp, log_text, cls_result, ground_truth, log_id=log_id
                         )
                         results_saved.append(run_result)
                     except Exception as e:
-                        st.warning(f"{log_id}: エラー — {e}")
+                        import traceback
+                        with st.expander(f"❌ {log_id}: エラー — {type(e).__name__}: {e}", expanded=True):
+                            st.code(traceback.format_exc(), language="python")
 
                     progress.progress((i + 1) / len(dataset))
 
                 status.empty()
-                n_correct = sum(r.exact_match for r in results_saved)
-                avg_jaccard = sum(r.jaccard for r in results_saved) / len(results_saved) if results_saved else 0.0
-                st.success(
-                    f"完了: {len(results_saved)} 件処理 / "
-                    f"完全一致 {n_correct}/{len(results_saved)} "
-                    f"({n_correct/len(results_saved)*100:.1f}%) / "
-                    f"平均 Jaccard {avg_jaccard:.3f}"
-                )
+                if results_saved:
+                    n_correct = sum(r.exact_match for r in results_saved)
+                    avg_jaccard = sum(r.jaccard for r in results_saved) / len(results_saved)
+                    st.success(
+                        f"完了: {len(results_saved)} 件処理 / "
+                        f"完全一致 {n_correct}/{len(results_saved)} "
+                        f"({n_correct/len(results_saved)*100:.1f}%) / "
+                        f"平均 Jaccard {avg_jaccard:.3f}"
+                    )
+                else:
+                    st.error(
+                        "推論に成功した件数が 0 件でした。"
+                        "ナレッジやログが長すぎる可能性があります。"
+                        "Settings で knowledge_token_limit や n_ctx を確認してください。"
+                    )
 
 
 # ===========================================================================
@@ -307,6 +376,7 @@ with tab_results:
             summary_rows = []
             for r in class_results:
                 summary_rows.append({
+                    "log_id": r.log_id or "—",
                     "timestamp": r.timestamp[:19],
                     "log（先頭50字）": r.log_input[:50],
                     "正解": ", ".join(r.ground_truth),
@@ -316,13 +386,13 @@ with tab_results:
                     "Jaccard": round(r.jaccard, 3),
                 })
             df = pd.DataFrame(summary_rows)
-            st.dataframe(df, use_container_width=True, hide_index=True)
+            st.dataframe(df, width="stretch", hide_index=True)
 
             st.markdown("**ラベル別詳細**")
             sel_idx = st.selectbox(
                 "詳細を表示するログ",
                 options=list(range(len(class_results))),
-                format_func=lambda i: f"[{i+1}] {class_results[i].log_input[:60]}",
+                format_func=lambda i: f"[{i+1}] {class_results[i].log_id or '—'} | {class_results[i].log_input[:50]}",
                 key="res_detail_idx",
             )
             if sel_idx is not None:
@@ -337,7 +407,7 @@ with tab_results:
                         "Confidence": round(lp.confidence, 3),
                         "Yes 比率": round(lp.yes_ratio, 3),
                     })
-                st.dataframe(pd.DataFrame(detail_rows), use_container_width=True, hide_index=True)
+                st.dataframe(pd.DataFrame(detail_rows), width="stretch", hide_index=True)
 
 
 # ===========================================================================
@@ -382,7 +452,7 @@ with tab_compare:
 
             if compare_rows:
                 cmp_df = pd.DataFrame(compare_rows)
-                st.dataframe(cmp_df, use_container_width=True, hide_index=True)
+                st.dataframe(cmp_df, width="stretch", hide_index=True)
 
                 st.bar_chart(cmp_df.set_index("実験 ID")[["完全一致率", "平均 Jaccard"]])
             else:

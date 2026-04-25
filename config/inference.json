@@ -1,8 +1,9 @@
 {
   "active_model": "qwen2.5-3b-instruct-q4_k_m",
   "active_template": "default",
+  "knowledge_token_limit": 512,
   "model": {
-    "n_ctx": 4096,
+    "n_ctx": 0,
     "n_gpu_layers": 0,
     "verbose": false
   },

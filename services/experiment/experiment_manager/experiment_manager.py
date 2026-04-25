@@ -159,6 +159,7 @@ class ExperimentManager:
         log_input: str,
         classification_result: Any,   # ClassificationResult from classifier.py
         ground_truth: list[str],
+        log_id: str = "",
     ) -> ClassRunResult:
         """
         ClassificationService.classify() の返り値を受け取り、
@@ -198,6 +199,7 @@ class ExperimentManager:
             ground_truth=ground_truth,
             exact_match=exact_match,
             jaccard=jaccard,
+            log_id=log_id,
             label_predictions=label_preds,
         )
 

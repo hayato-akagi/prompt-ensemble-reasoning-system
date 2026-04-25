@@ -1,0 +1,41 @@
+# GPU (NVIDIA CUDA) 対応オーバーライド
+#
+# 起動方法:
+#   docker compose -f docker-compose.yml -f docker-compose.gpu.yml up ui
+#
+# 事前確認:
+#   nvidia-smi                          # ドライバー・CUDAバージョン確認
+#   docker run --rm --gpus all nvidia/cuda:12.4.1-base-ubuntu22.04 nvidia-smi
+#                                       # Container Toolkit の動作確認
+#
+# CUDAバージョンが異なる場合:
+#   Dockerfile.cuda の FROM を nvidia/cuda:<version>-devel-ubuntu22.04 に変更
+#
+# n_gpu_layers の設定:
+#   config/inference.json の n_gpu_layers を -1（全レイヤーをGPUに配置）に変更するか
+#   UI の Settings ページから変更してください。
+
+services:
+  inference:
+    build:
+      context: .
+      dockerfile: services/inference/Dockerfile.cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  ui:
+    build:
+      context: .
+      dockerfile: services/ui/Dockerfile.cuda
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

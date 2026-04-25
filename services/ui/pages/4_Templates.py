@@ -39,12 +39,12 @@ if st.session_state.tpl_mode in ("list", "edit"):
         for name in names:
             selected = st.session_state.tpl_selected == name
             label = f"**{name}**" if selected else name
-            if st.button(label, key=f"sel_{name}", use_container_width=True):
+            if st.button(label, key=f"sel_{name}", width="stretch"):
                 _set_mode("edit", name)
                 st.rerun()
 
         st.divider()
-        if st.button("+ 新規テンプレート", use_container_width=True, type="primary"):
+        if st.button("+ 新規テンプレート", width="stretch", type="primary"):
             _set_mode("new")
             st.rerun()
 
@@ -67,7 +67,7 @@ if st.session_state.tpl_mode in ("list", "edit"):
 
             c1, c2 = st.columns(2)
             with c1:
-                if st.button("保存", type="primary", use_container_width=True):
+                if st.button("保存", type="primary", width="stretch"):
                     try:
                         tm.save(name, new_content, overwrite=True)
                         st.success(f"`{name}` を保存しました。")
@@ -75,7 +75,7 @@ if st.session_state.tpl_mode in ("list", "edit"):
                         st.error(f"エラー: {e}")
             with c2:
                 if name != "default":
-                    if st.button("削除", type="secondary", use_container_width=True):
+                    if st.button("削除", type="secondary", width="stretch"):
                         _set_mode("delete", name)
                         st.rerun()
                 else:
@@ -106,7 +106,7 @@ elif st.session_state.tpl_mode == "new":
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("作成", type="primary", use_container_width=True):
+        if st.button("作成", type="primary", width="stretch"):
             if not new_name.strip():
                 st.warning("テンプレート名は必須です。")
             else:
@@ -120,7 +120,7 @@ elif st.session_state.tpl_mode == "new":
                 except Exception as e:
                     st.error(f"エラー: {e}")
     with c2:
-        if st.button("← キャンセル", use_container_width=True):
+        if st.button("← キャンセル", width="stretch"):
             _set_mode("list")
             st.rerun()
 
@@ -135,7 +135,7 @@ elif st.session_state.tpl_mode == "delete":
 
     c1, c2 = st.columns(2)
     with c1:
-        if st.button("削除する", type="primary", use_container_width=True):
+        if st.button("削除する", type="primary", width="stretch"):
             try:
                 tm.delete(name)
                 st.success(f"`{name}` を削除しました。")
@@ -144,6 +144,6 @@ elif st.session_state.tpl_mode == "delete":
             except Exception as e:
                 st.error(f"エラー: {e}")
     with c2:
-        if st.button("← キャンセル", use_container_width=True):
+        if st.button("← キャンセル", width="stretch"):
             _set_mode("list")
             st.rerun()

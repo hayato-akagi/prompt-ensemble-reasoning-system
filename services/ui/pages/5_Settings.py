@@ -108,6 +108,20 @@ st.divider()
 # --------------------------------------------------------------------------
 # Inference parameters
 # --------------------------------------------------------------------------
+st.subheader("ナレッジ設定")
+
+knowledge_token_limit = st.number_input(
+    "ナレッジ自動要約トークン閾値 (knowledge_token_limit, 0=無効)",
+    min_value=0,
+    max_value=8192,
+    value=cfg.get("knowledge_token_limit", 512),
+    step=64,
+    help="1ナレッジ単体がこのトークン数を超えると自動要約されます。0 で無効。",
+    key="cfg_knowledge_token_limit",
+)
+
+st.divider()
+
 st.subheader("推論パラメータ")
 
 col1, col2 = st.columns(2)
@@ -154,11 +168,12 @@ st.subheader("モデルロードパラメータ")
 col1, col2 = st.columns(2)
 with col1:
     n_ctx = st.number_input(
-        "コンテキスト長 (n_ctx)",
-        min_value=512,
+        "コンテキスト長 (n_ctx, 0=モデルの最大値を自動使用)",
+        min_value=0,
         max_value=32768,
-        value=cfg.get("model", {}).get("n_ctx", 4096),
+        value=cfg.get("model", {}).get("n_ctx", 0),
         step=512,
+        help="0 に設定すると models.json の context_length（Qwen2.5 は 32768）を使用します。",
         key="cfg_n_ctx",
     )
 with col2:
@@ -178,6 +193,7 @@ if st.button("設定を保存", type="primary"):
     new_cfg = {
         "active_model": selected_model_id,
         "active_template": selected_template,
+        "knowledge_token_limit": int(knowledge_token_limit),
         "model": {
             "n_ctx": int(n_ctx),
             "n_gpu_layers": int(n_gpu_layers),

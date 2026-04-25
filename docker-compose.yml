@@ -85,7 +85,7 @@ services:
       context: .
       dockerfile: services/ui/Dockerfile
     ports:
-      - "8501:8501"
+      - "8504:8501"
     volumes:
       - ./data/knowledge:/app/data/knowledge
       - ./data/models:/app/data/models

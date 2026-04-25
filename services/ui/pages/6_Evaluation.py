@@ -42,7 +42,7 @@ if _LABELS_PATH.exists():
             for q, ans in item.get("labels", {}).items():
                 rows.append({"log_id": item["log_id"], "difficulty": item.get("difficulty", "—"),
                              "question": q[:60], "answer": ans, "note": item.get("note", "")})
-        st.dataframe(pd.DataFrame(rows), use_container_width=True)
+        st.dataframe(pd.DataFrame(rows), width="stretch")
 else:
     st.warning(
         "`data/knowledge/eval_labels.json` が見つかりません。\n\n"
@@ -112,7 +112,7 @@ df_metrics = pd.DataFrame([
     }
     for b in baselines_data
 ])
-st.dataframe(df_metrics, use_container_width=True)
+st.dataframe(df_metrics, width="stretch")
 
 # Bar charts
 col1, col2 = st.columns(2)
@@ -150,7 +150,7 @@ if n_curve_path.exists():
         n_data = json.load(f)
     n_df = pd.DataFrame(n_data).set_index("n")[["accuracy", "f1", "ece"]]
     st.line_chart(n_df)
-    st.dataframe(n_df.reset_index(), use_container_width=True)
+    st.dataframe(n_df.reset_index(), width="stretch")
 
 # ---------------------------------------------------------------------------
 # Section 5: Per-prediction details
@@ -191,7 +191,7 @@ if available_baselines:
 
     n_correct = (pred_df["correct"] == "✓").sum()
     st.caption(f"{n_correct} / {len(pred_df)} 件正解")
-    st.dataframe(pred_df, use_container_width=True)
+    st.dataframe(pred_df, width="stretch")
 
     # Confidence distribution by correctness
     st.subheader("Confidence 分布（正解 vs 不正解）")

@@ -1,0 +1,25 @@
+FROM nvidia/cuda:12.4.1-devel-ubuntu22.04
+
+WORKDIR /app
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 python3.12-dev python3-pip \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN ln -sf /usr/bin/python3.12 /usr/bin/python3 \
+ && ln -sf /usr/bin/python3 /usr/bin/python \
+ && ln -sf /usr/bin/pip3 /usr/bin/pip
+
+COPY requirements.txt .
+# CPU版をインストールしてからCUDA対応版で上書き
+RUN pip install --no-cache-dir -r requirements.txt \
+ && CMAKE_ARGS="-DGGML_CUDA=ON" pip install --no-cache-dir --force-reinstall llama-cpp-python
+
+COPY config/ config/
+COPY services/ services/
+COPY tests/__init__.py tests/__init__.py
+COPY tests/inference/ tests/inference/
+COPY tests/integration/ tests/integration/
+COPY pytest.ini .
+
+CMD ["pytest", "tests/inference/", "-v"]
